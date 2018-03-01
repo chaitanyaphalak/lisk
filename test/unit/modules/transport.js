@@ -1290,10 +1290,6 @@ describe('transport', () => {
 
 				describe('when it does not throw', () => {
 					describe('when query.block is defined', () => {
-						it('should call bson.deserialize');
-
-						it('should call bson.deserialize with Buffer.from(query.block)');
-
 						describe('block', () => {
 							it('should call modules.blocks.verify.addBlockProperties');
 
