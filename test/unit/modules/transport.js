@@ -1263,56 +1263,77 @@ describe('transport', () => {
 				});
 			});
 
+			// TODO: Waiting on https://github.com/LiskHQ/lisk/pull/1644
 			describe('postBlock', () => {
-				describe('when query is undefined', () => {
-					it('should set query = {}');
+				var query;
+
+				beforeEach(done => {
+					library.bus = {
+						message: sinonSandbox.stub(),
+					};
+					done();
 				});
 
-				describe('when it throws', () => {
-					it('should call library.logger.debug');
+				describe('when query is specified', () => {
+					beforeEach(done => {
+						transportInstance.shared.postBlock(query);
+						done();
+					});
 
-					it(
-						'should call library.logger.debug with "Block normalization failed"'
-					);
+					describe('when it throws', () => {
+						var blockValidationError = 'Failed to validate block schema';
 
-					it(
-						'should call library.logger.debug with {err: e.toString(), module: "transport", block: query.block }'
-					);
+						beforeEach(done => {
+							library.logic.block.objectNormalize = sinonSandbox.stub().throws(blockValidationError);
+							transportInstance.shared.postBlock(query);
+							done();
+						});
 
-					it('should call __private.removePeer');
+						it(
+							'should call library.logger.debug with "Block normalization failed" and {err: error, module: "transport", block: query.block }',
+							() => {
+								return expect(library.logger.debug.calledWith('Block normalization failed', { err: blockValidationError, module: 'transport', block: query.block })).to.be.true;
+							}
+						);
 
-					it(
-						'should call __private.removePeer with {peer: query.peer, code: "EBLOCK"}'
-					);
+						it(
+							'should call __private.removePeer with {peer: query.peer, code: "EBLOCK"}',
+							() => {
+								return expect(__private.removePeer.calledWith({ peer: query.peer, code: 'EBLOCK' })).to.be.true;
+							}
+						);
+					});
 
-					it('should call callback with error = e.toString()');
-				});
+					describe('when it does not throw', () => {
+						var blockMock;
 
-				describe('when it does not throw', () => {
-					describe('when query.block is defined', () => {
-						describe('block', () => {
-							it('should call modules.blocks.verify.addBlockProperties');
+						beforeEach(done => {
+							blockMock = Block();
 
+							library.logic.block.objectNormalize = sinonSandbox.stub().returns(blockMock);
+							modules.blocks.verify.addBlockProperties = sinonSandbox.stub().returns(blockMock);
+							transportInstance.shared.postBlock(query);
+							done();
+						});
+
+						describe('when query.block is defined', () => {
 							it(
-								'should call modules.blocks.verify.addBlockProperties with query.block'
+								'should call modules.blocks.verify.addBlockProperties with query.block',
+								() => {
+									return expect(modules.blocks.verify.addBlockProperties.calledWith(query.block)).to.be.true;
+								}
 							);
+						});
+
+						it('should call library.logic.block.objectNormalize with block', () => {
+							return expect(library.logic.block.objectNormalize.calledWith(blockMock)).to.be.true;
 						});
 					});
 
-					it('should call library.logic.block.objectNormalize');
+					it('should call library.bus.message with "receiveBlock" and block', () => {
+						return expect(library.bus.message.calledWith('receiveBlock', blockMock)).to.be.true;
+					});
 				});
-
-				it('should call library.bus.message');
-
-				it('should call library.bus.message with "receiveBlock"');
-
-				it('should call library.bus.message with block');
-
-				it('should call callback with error = null');
-
-				it(
-					'should call callback with result = {success: true, blockId: block.id}'
-				);
 			});
 
 			describe('list', () => {
