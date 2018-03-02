@@ -36,6 +36,7 @@ __private.assetTypes = {};
 __private.loaded = false;
 __private.keypairs = {};
 __private.tmpKeypairs = {};
+__private.forgeInterval = 1000;
 
 /**
  * Main delegates methods. Initializes library with scope content and generates a Delegate instance.
@@ -909,6 +910,13 @@ Delegates.prototype.onBind = function(scope) {
 };
 
 /**
+ * job queue event for checking/forging a block
+ */
+__private.nextForge = function(cb) {
+	async.series([__private.forge, modules.transactions.fillPool], cb);
+};
+
+/**
  * Loads delegates.
  */
 Delegates.prototype.onBlockchainReady = function() {
@@ -918,13 +926,16 @@ Delegates.prototype.onBlockchainReady = function() {
 		if (err) {
 			library.logger.error('Failed to load delegates', err);
 		}
-		function nextForge(cb) {
-			async.series([__private.forge, modules.transactions.fillPool], () =>
-				setImmediate(cb)
-			);
-		}
 
-		jobsQueue.register('delegatesNextForge', nextForge, 1000);
+		jobsQueue.register(
+			'delegatesNextForge',
+			cb => {
+				library.sequence.add(sequenceCb => {
+					__private.nextForge(sequenceCb);
+				}, cb);
+			},
+			__private.forgeInterval
+		);
 	});
 };
 
